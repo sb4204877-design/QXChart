@@ -1,0 +1,1515 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QXChart - Bitcoin</title>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: #0f172a;
+  color: #cbd5e1;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+#chart-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: #0f172a;
+}
+canvas {
+  display: block;
+  position: absolute;
+}
+#main-canvas {
+  top: 0;
+  left: 0;
+  cursor: crosshair;
+}
+#price-canvas {
+  right: 0;
+  top: 0;
+  width: 60px;
+  background: #0f172a;
+  border-left: 1px solid #334155;
+}
+#time-canvas {
+  bottom: 0;
+  left: 0;
+  height: 30px;
+  background: #0f172a;
+  border-top: 1px solid #334155;
+}
+#corner {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 60px;
+  height: 30px;
+  background: #0f172a;
+  border-left: 1px solid #334155;
+  border-top: 1px solid #334155;
+}
+
+/* Info Panel */
+#info-panel {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 11px;
+  min-width: 140px;
+  box-shadow: 0 6px 16px -4px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+  display: none;
+  transition: all 0.2s ease;
+}
+.info-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+}
+.symbol {
+  font-weight: 700;
+  font-size: 12px;
+  color: #fff;
+  letter-spacing: -0.2px;
+}
+.timeframe {
+  background: rgba(51, 65, 85, 0.5);
+  padding: 1px 6px;
+  border-radius: 12px;
+  font-size: 9px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  margin: 2px 0;
+  font-family: 'SF Mono', 'Menlo', monospace;
+  font-size: 11px;
+}
+.info-label {
+  color: #94a3b8;
+  font-size: 11px;
+}
+.info-value {
+  font-weight: 600;
+  color: #cbd5e1;
+}
+.ohlc-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(51, 65, 85, 0.5);
+}
+.ohlc-item {
+  text-align: center;
+}
+.ohlc-label {
+  font-size: 8px;
+  color: #94a3b8;
+  margin-bottom: 1px;
+  font-weight: 500;
+}
+.ohlc-value {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: 'SF Mono', 'Menlo', monospace;
+}
+.up { color: #00C510; }
+.down { color: #ff0000; }
+
+/* Loading Spinner */
+#loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  z-index: 1000;
+}
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(51, 65, 85, 0.5);
+  border-top-color: #4dffcc;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Menu Button */
+#menu-button {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  width: 50px;
+  height: 50px;
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 200;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  transition: all 0.3s ease;
+}
+#menu-button:hover {
+  background: rgba(30, 41, 59, 0.9);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* Square Menu Icon */
+.square-menu-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 0;
+}
+.square-menu-icon .line {
+  width: 18px;
+  height: 2px;
+  background: #cbd5e1;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+}
+#menu-button:hover .line:nth-child(1) { transform: translateY(-2px); }
+#menu-button:hover .line:nth-child(4) { transform: translateY(2px); }
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+.modal-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Modal Card */
+.modal-card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.5);
+  transform: translateY(20px);
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.modal-overlay.active .modal-card {
+  transform: translateY(0);
+}
+.modal-header {
+  padding: 18px 24px;
+  background: rgba(15, 23, 42, 0.7);
+  border-bottom: 1px solid #334155;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.3px;
+}
+.close-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+.close-btn:hover {
+  background: rgba(51, 65, 85, 0.5);
+  color: #cbd5e1;
+}
+.modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  max-height: calc(80vh - 100px);
+}
+
+/* Menu Items */
+.menu-item {
+  padding: 14px 18px;
+  border-bottom: 1px solid #334155;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: all 0.2s;
+  border-radius: 10px;
+  margin-bottom: 4px;
+}
+.menu-item:hover {
+  background: rgba(30, 41, 59, 0.7);
+  transform: translateX(4px);
+}
+.menu-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+.menu-icon-wrapper {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(51, 65, 85, 0.3);
+  border-radius: 8px;
+}
+.menu-text {
+  font-size: 15px;
+  color: #cbd5e1;
+  font-weight: 500;
+}
+
+/* Settings Form */
+.settings-group {
+  margin-bottom: 20px;
+}
+.settings-label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 14px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+.color-input {
+  width: 100%;
+  padding: 10px 14px;
+  background: #334155;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  color: #cbd5e1;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+.color-input:focus {
+  outline: none;
+  border-color: #4dffcc;
+  box-shadow: 0 0 0 3px rgba(77, 255, 204, 0.2);
+}
+
+/* Search Container */
+.search-container {
+  margin-bottom: 20px;
+  position: relative;
+}
+.search-input {
+  width: 100%;
+  padding: 12px 14px 12px 42px;
+  background: #334155;
+  border: 1px solid #475569;
+  border-radius: 10px;
+  color: #cbd5e1;
+  font-size: 15px;
+  outline: none;
+  transition: all 0.2s;
+}
+.search-input:focus {
+  border-color: #4dffcc;
+  box-shadow: 0 0 0 3px rgba(77, 255, 204, 0.2);
+}
+.search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  width: 20px;
+  height: 20px;
+}
+
+/* Timeframes Grid */
+.timeframes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 14px;
+}
+.timeframe-btn {
+  padding: 14px;
+  background: #334155;
+  border: 1px solid #475569;
+  border-radius: 10px;
+  color: #cbd5e1;
+  font-size: 14px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s;
+  font-weight: 600;
+}
+.timeframe-btn:hover {
+  background: #475569;
+  border-color: #64748b;
+  color: #4dffcc;
+  transform: translateY(-2px);
+}
+.timeframe-btn.active {
+  background: rgba(77, 255, 204, 0.25);
+  border-color: #4dffcc;
+  color: #4dffcc;
+  font-weight: bold;
+  box-shadow: 0 4px 12px rgba(77, 255, 204, 0.3);
+}
+
+/* Price Line */
+.price-line {
+  position: absolute;
+  left: 0;
+  width: calc(100% - 60px);
+  height: 1px;
+  background: repeating-linear-gradient(
+    to right,
+    transparent,
+    transparent 4px,
+    currentColor 4px,
+    currentColor 8px
+  );
+  pointer-events: none;
+  z-index: 50;
+  display: block !important;
+}
+
+/* Last Price Label */
+.last-price-label {
+  position: absolute;
+  right: 0px;
+  width: 60px;
+  transform: translateY(-50%);
+  color: white;
+  padding: 10px 6px;
+  border-radius: 4px 0 0 4px;
+  font-size: 13px;
+  font-weight: bold;
+  font-family: 'SF Mono', 'Menlo', monospace;
+  white-space: nowrap;
+  z-index: 60;
+  display: block !important;
+  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.4);
+  text-align: center;
+  transition: all 0.2s ease;
+}
+.last-price-label .price {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 4px;
+  font-weight: bold;
+}
+.last-price-label .timer {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  display: block;
+  font-weight: normal;
+}
+
+/* Indicator List */
+.indicator-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px;
+  border-bottom: 1px solid #334155;
+  border-radius: 10px;
+  margin-bottom: 6px;
+  background: rgba(30, 41, 59, 0.5);
+}
+.indicator-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.indicator-badge {
+  background: #4dffcc;
+  color: #000;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.indicator-actions {
+  display: flex;
+  gap: 10px;
+}
+.indicator-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: #334155;
+  color: #cbd5e1;
+  border: none;
+  transition: all 0.2s;
+}
+.indicator-btn:hover {
+  background: #475569;
+  transform: scale(1.05);
+}
+.indicator-btn.settings { 
+  background: #4dffcc; 
+  color: #000; 
+}
+.indicator-btn.toggle.hidden { 
+  background: #ff0000; 
+}
+
+/* Symbols List */
+.symbols-list {
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.symbols-list::-webkit-scrollbar {
+  width: 6px;
+}
+.symbols-list::-webkit-scrollbar-track {
+  background: rgba(30, 41, 59, 0.5);
+  border-radius: 10px;
+}
+.symbols-list::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 10px;
+}
+.symbol-item {
+  padding: 14px 18px;
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  margin-bottom: 8px;
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid transparent;
+}
+.symbol-item:hover {
+  background: rgba(51, 65, 85, 0.7);
+  transform: translateY(-2px);
+  border-color: #4dffcc;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+.symbol-name {
+  font-size: 15px;
+  color: #cbd5e1;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+.symbol-price {
+  font-size: 14px;
+  color: #94a3b8;
+  font-family: 'SF Mono', 'Menlo', monospace;
+  font-weight: 500;
+}
+.symbol-change {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: 700;
+  min-width: 70px;
+  text-align: center;
+}
+.symbol-change.up {
+  background: rgba(0, 197, 16, 0.2);
+  color: #00C510;
+}
+.symbol-change.down {
+  background: rgba(255, 0, 0, 0.2);
+  color: #ff0000;
+}
+.no-results {
+  text-align: center;
+  padding: 24px;
+  color: #94a3b8;
+  font-size: 14px;
+  font-style: italic;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.symbol-item { animation: slideIn 0.3s ease-out forwards; }
+.symbol-item:nth-child(n) { animation-delay: calc(0.05s * var(--i, 1)); }
+
+@media (max-width: 768px) {
+  .modal-card { width: 95%; max-width: 400px; }
+  .symbol-item { padding: 12px 16px; }
+  .symbol-name { font-size: 14px; }
+  .symbol-price { font-size: 13px; }
+  .symbol-change { font-size: 11px; padding: 3px 8px; min-width: 60px; }
+}
+</style>
+</head>
+<body>
+<div id="chart-container">
+<canvas id="main-canvas"></canvas>
+<canvas id="price-canvas"></canvas>
+<canvas id="time-canvas"></canvas>
+<div id="corner"></div>
+<div id="info-panel">
+<div class="info-header">
+<span class="symbol">BTC/USDT</span>
+<span class="timeframe">1m</span>
+</div>
+<div class="info-row">
+<span class="info-label">Date:</span>
+<span class="info-value" id="info-date">-</span>
+</div>
+<div class="info-row">
+<span class="info-label">Change:</span>
+<span class="info-value" id="info-change">-</span>
+</div>
+<div class="ohlc-grid">
+<div class="ohlc-item">
+<div class="ohlc-label">Open</div>
+<div class="ohlc-value" id="info-o">-</div>
+</div>
+<div class="ohlc-item">
+<div class="ohlc-label">High</div>
+<div class="ohlc-value" id="info-h">-</div>
+</div>
+<div class="ohlc-item">
+<div class="ohlc-label">Low</div>
+<div class="ohlc-value" id="info-l">-</div>
+</div>
+<div class="ohlc-item">
+<div class="ohlc-label">Close</div>
+<div class="ohlc-value" id="info-c">-</div>
+</div>
+</div>
+</div>
+<div id="loading">
+<div class="spinner"></div>
+<div style="color: #94a3b8; font-size: 14px;">Loading chart...</div>
+</div>
+
+<div id="menu-button">
+<div class="square-menu-icon">
+<div class="line"></div><div class="line"></div>
+<div class="line"></div><div class="line"></div>
+</div>
+</div>
+
+<div class="price-line" id="price-line"></div>
+<div class="last-price-label" id="last-price-label">
+<span class="price">--</span>
+<span class="timer">--:--</span>
+</div>
+
+<!-- Menu Modal -->
+<div id="menu-modal" class="modal-overlay">
+<div class="modal-card">
+<div class="modal-header">
+<div class="modal-title">Menu</div>
+<button class="close-btn" id="menu-close">×</button>
+</div>
+<div class="modal-body">
+<div class="menu-item" data-action="indicators">
+<div class="menu-icon-wrapper">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2">
+<polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/>
+</svg>
+</div>
+<span class="menu-text">Indicators</span>
+</div>
+<div class="menu-item" data-action="settings">
+<div class="menu-icon-wrapper">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2">
+<circle cx="12" cy="12" r="3"/>
+<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+</svg>
+</div>
+<span class="menu-text">Settings</span>
+</div>
+<div class="menu-item" data-action="timeframes">
+<div class="menu-icon-wrapper">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2">
+<circle cx="12" cy="12" r="10"/>
+<polyline points="12,6 12,12 16,14"/>
+</svg>
+</div>
+<span class="menu-text">Timeframes</span>
+</div>
+<div class="menu-item" data-action="symbols">
+<div class="menu-icon-wrapper">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2">
+<path d="M12 2L2 7l10 5 10-5-10-5z"/>
+<path d="M2 17l10 5 10-5"/>
+<path d="M2 12l10 5 10-5"/>
+</svg>
+</div>
+<span class="menu-text">Symbols</span>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Indicators Modal -->
+<div id="indicators-modal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-title">Indicators</div>
+      <button class="close-btn" id="indicators-close">×</button>
+    </div>
+    <div class="modal-body" id="indicators-list"></div>
+  </div>
+</div>
+
+<!-- MA Settings Panel -->
+<div id="indicator-settings-panel" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-title">MA Settings</div>
+      <button class="close-btn" id="settings-panel-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="settings-group">
+        <label class="settings-label">Period</label>
+        <input type="range" min="5" max="100" value="20" class="color-input" id="ma-period" style="height: 28px;">
+        <div style="text-align: center; margin-top: 6px; color: #94a3b8;" id="ma-period-value">20</div>
+      </div>
+      <div class="settings-group">
+        <label class="settings-label">Color</label>
+        <input type="color" class="color-input" id="ma-color" value="#4dffcc">
+      </div>
+      <div style="margin-top: 24px; text-align: center;">
+        <button id="apply-ma-settings" class="timeframe-btn" style="width: 100%; padding: 14px;">Apply</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Donchian Settings Panel -->
+<div id="donchian-settings-panel" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-title">Donchian Signals Settings</div>
+      <button class="close-btn" id="donchian-settings-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="settings-group">
+        <label class="settings-label">Donchian Length</label>
+        <input type="range" min="10" max="100" value="30" class="color-input" id="donchian-length" style="height: 28px;">
+        <div style="text-align: center; margin-top: 6px; color: #94a3b8;" id="donchian-length-value">30</div>
+      </div>
+      <div class="settings-group">
+        <label class="settings-label">MA Length</label>
+        <input type="range" min="3" max="50" value="8" class="color-input" id="donchian-ma" style="height: 28px;">
+        <div style="text-align: center; margin-top: 6px; color: #94a3b8;" id="donchian-ma-value">8</div>
+      </div>
+      <div class="settings-group">
+        <label class="settings-label">Buy Color</label>
+        <input type="color" class="color-input" id="donchian-buy-color" value="#1ecb4f">
+      </div>
+      <div class="settings-group">
+        <label class="settings-label">Sell Color</label>
+        <input type="color" class="color-input" id="donchian-sell-color" value="#e02424">
+      </div>
+      <div style="margin-top: 24px; text-align: center;">
+        <button id="apply-donchian-settings" class="timeframe-btn" style="width: 100%; padding: 14px;">Apply</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="settings-modal" class="modal-overlay">
+<div class="modal-card">
+<div class="modal-header">
+<div class="modal-title">Settings</div>
+<button class="close-btn" id="settings-close">×</button>
+</div>
+<div class="modal-body">
+<div class="settings-group">
+<label class="settings-label">Chart Background Color</label>
+<input type="color" class="color-input" id="bg-color" value="#0f172a">
+</div>
+<div class="settings-group">
+<label class="settings-label">Bullish Candle Color</label>
+<input type="color" class="color-input" id="up-color" value="#00C510">
+</div>
+<div class="settings-group">
+<label class="settings-label">Bearish Candle Color</label>
+<input type="color" class="color-input" id="down-color" value="#ff0000">
+</div>
+</div>
+</div>
+</div>
+
+<!-- Timeframes Modal -->
+<div id="timeframes-modal" class="modal-overlay">
+<div class="modal-card">
+<div class="modal-header">
+<div class="modal-title">Timeframes</div>
+<button class="close-btn" id="timeframes-close">×</button>
+</div>
+<div class="modal-body">
+<div class="timeframes-grid" id="timeframes-grid"></div>
+</div>
+</div>
+</div>
+
+<!-- Symbols Modal -->
+<div id="symbols-modal" class="modal-overlay">
+<div class="modal-card">
+<div class="modal-header">
+<div class="modal-title">Symbols</div>
+<button class="close-btn" id="symbols-close">×</button>
+</div>
+<div class="modal-body">
+<div class="search-container">
+<svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+<circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+</svg>
+<input type="text" class="search-input" id="symbol-search" placeholder="Search symbols...">
+</div>
+<div class="symbols-list" id="symbols-list"></div>
+</div>
+</div>
+</div>
+</div>
+
+<script>
+// ======================
+// Global Variables
+// ======================
+let currentAsset = "BTC/USDT";
+let currentTimeframe = "1m";
+let timeframeSeconds = 60;
+let serverTimeOffset = 0;
+let allCategories = null;
+let countdownTimer = null;
+let lastCandleTimeGlobal = 0;
+let needsResetView = true;
+
+// ======================
+// Chart Configuration
+// ======================
+const CONFIG = {
+  candleCount: 500,
+  defaultBarSpacing: 8,
+  minBarSpacing: 2,
+  maxBarSpacing: 50,
+  priceDecimals: 2,
+  colors: {
+    bg: '#0f172a',
+    grid: '#334155',
+    crosshair: '#94a3b8',
+    up: '#00C510',
+    down: '#ff0000',
+    wick: '#64748b',
+    text: '#94a3b8',
+    textBright: '#cbd5e1',
+    ma: '#4dffcc'
+  },
+  maPeriod: 20,
+  maColor: '#4dffcc',
+  maEnabled: false,
+  donchian: {
+    enabled: false,
+    donchianLength: 30,
+    maLength: 8,
+    buyColor: '#1ecb4f',
+    sellColor: '#e02424'
+  }
+};
+
+// ======================
+// Donchian Signals Logic
+// ======================
+class DonchianSignals {
+  constructor() {
+    this.plottedSignals = new Set();
+    this.signals = [];
+    this.lastProcessedIndex = -1;
+  }
+  reset() {
+    this.plottedSignals.clear();
+    this.signals = [];
+    this.lastProcessedIndex = -1;
+  }
+  calculateEMA(data, period) {
+    if (data.length < period) return null;
+    const k = 2 / (period + 1);
+    let ema = data[0].close;
+    for (let i = 1; i < data.length; i++) {
+      ema = data[i].close * k + ema * (1 - k);
+    }
+    return ema;
+  }
+  highest(arr, len, key = 'high') {
+    const start = Math.max(0, arr.length - len);
+    let max = -Infinity;
+    for (let i = start; i < arr.length; i++) {
+      if (arr[i][key] > max) max = arr[i][key];
+    }
+    return max;
+  }
+  lowest(arr, len, key = 'low') {
+    const start = Math.max(0, arr.length - len);
+    let min = Infinity;
+    for (let i = start; i < arr.length; i++) {
+      if (arr[i][key] < min) min = arr[i][key];
+    }
+    return min;
+  }
+  processAll(candles) {
+    if (!CONFIG.donchian.enabled || candles.length < CONFIG.donchian.donchianLength + 2) return;
+    this.signals = [];
+    this.plottedSignals.clear();
+    const len = CONFIG.donchian.donchianLength;
+    const maLen = CONFIG.donchian.maLength;
+    for (let i = len + 1; i < candles.length; i++) {
+      this.checkCandle(candles, i, len, maLen);
+    }
+    this.lastProcessedIndex = candles.length - 1;
+  }
+  checkCandle(candles, index, len, maLen) {
+    const slice = candles.slice(0, index + 1);
+    const upper = this.highest(slice, len, 'high');
+    const lower = this.lowest(slice, len, 'low');
+    const basis = (upper + lower) / 2;
+    const ma = this.calculateEMA(slice, maLen);
+    if (ma === null) return;
+    const curr = candles[index];
+    const prev = candles[index - 1];
+    let higherhigh = 0, lowerlow = 0;
+    for (let j = index; j >= Math.max(0, index - 4); j--) {
+      if (candles[j].high > upper) higherhigh++; else break;
+    }
+    for (let j = index; j >= Math.max(0, index - 4); j--) {
+      if (candles[j].low < lower) lowerlow++; else break;
+    }
+    const aboveBasis = curr.close > basis;
+    const belowBasis = curr.close < basis;
+    const bullishCandle = curr.close > curr.open;
+    const bearishCandle = curr.close < curr.open;
+    const aboveMA = curr.close > ma;
+    const belowMA = curr.close < ma;
+    const buyCondition = bullishCandle && aboveMA && (
+      (aboveBasis && (prev.close <= basis || (candles[index - 2]?.close <= basis))) || (higherhigh > 1)
+    );
+    const sellCondition = bearishCandle && belowMA && (
+      (belowBasis && (prev.close >= basis || (candles[index - 2]?.close >= basis))) || (lowerlow > 1)
+    );
+    if (buyCondition) {
+      const signalKey = `idx_${index}_buy`;
+      if (!this.plottedSignals.has(signalKey)) {
+        this.plottedSignals.add(signalKey);
+        this.signals.push({ type: 'buy', index: index, price: curr.close, color: CONFIG.donchian.buyColor, time: Date.now() });
+      }
+    }
+    if (sellCondition) {
+      const signalKey = `idx_${index}_sell`;
+      if (!this.plottedSignals.has(signalKey)) {
+        this.plottedSignals.add(signalKey);
+        this.signals.push({ type: 'sell', index: index, price: curr.close, color: CONFIG.donchian.sellColor, time: Date.now() });
+      }
+    }
+  }
+  update(candles) {
+    if (!CONFIG.donchian.enabled) return;
+    const len = CONFIG.donchian.donchianLength;
+    const maLen = CONFIG.donchian.maLength;
+    for (let i = this.lastProcessedIndex + 1; i < candles.length; i++) {
+      if (i >= len + 1) this.checkCandle(candles, i, len, maLen);
+    }
+    this.lastProcessedIndex = candles.length - 1;
+  }
+  getSignals() { return this.signals; }
+}
+
+// ======================
+// TimeScale Class
+// ======================
+class TimeScale {
+  constructor() {
+    this.barSpacing = CONFIG.defaultBarSpacing;
+    this.offset = 0;
+    this.data = [];
+  }
+  setData(data) { this.data = data; }
+  indexToX(index, width) { return this.offset + (index * this.barSpacing); }
+  xToIndex(x, width) { return (x - this.offset) / this.barSpacing; }
+  getVisibleRange(width) {
+    const startIdx = Math.floor(this.xToIndex(0, width));
+    const endIdx = Math.ceil(this.xToIndex(width, width));
+    return { start: Math.max(0, startIdx), end: Math.min(this.data.length - 1, endIdx) };
+  }
+  scroll(delta, width) { this.offset += delta; }
+  zoom(factor, centerX, width) {
+    const oldSpacing = this.barSpacing;
+    const newSpacing = Math.max(CONFIG.minBarSpacing, Math.min(CONFIG.maxBarSpacing, oldSpacing * factor));
+    const centerIdx = this.xToIndex(centerX, width);
+    this.barSpacing = newSpacing;
+    const newCenterX = this.indexToX(centerIdx, width);
+    this.offset += (centerX - newCenterX);
+  }
+}
+
+// ======================
+// PriceScale Class
+// ======================
+class PriceScale {
+  constructor() { this.min = 0; this.max = 0; this.margin = 0.05; }
+  calculate(candles, startIdx, endIdx) {
+    let min = Infinity, max = -Infinity;
+    startIdx = Math.max(0, startIdx); endIdx = Math.min(candles.length - 1, endIdx);
+    for (let i = startIdx; i <= endIdx; i++) {
+      const c = candles[i];
+      if (c) { min = Math.min(min, c.low); max = Math.max(max, c.high); }
+    }
+    if (min === Infinity) { min = 0; max = 100; }
+    const range = max - min;
+    const safeRange = range < 0.0001 ? 0.0001 : range;
+    this.min = min - (safeRange * this.margin);
+    this.max = max + (safeRange * this.margin);
+  }
+  priceToY(price, height) {
+    const range = this.max - this.min;
+    const ratio = (price - this.min) / range;
+    return height - (ratio * height);
+  }
+  yToPrice(y, height) {
+    const range = this.max - this.min;
+    const ratio = (height - y) / height;
+    return this.min + (ratio * range);
+  }
+}
+
+// ======================
+// MainRenderer Class
+// ======================
+class MainRenderer {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.dpr = window.devicePixelRatio || 1;
+  }
+  resize(width, height) {
+    this.width = width; this.height = height;
+    this.canvas.width = Math.floor(width * this.dpr);
+    this.canvas.height = Math.floor(height * this.dpr);
+    this.canvas.style.width = `${width}px`; this.canvas.style.height = `${height}px`;
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0); this.ctx.scale(this.dpr, this.dpr);
+  }
+  clear() {
+    this.ctx.fillStyle = CONFIG.colors.bg;
+    this.ctx.fillRect(0, 0, this.width, this.height);
+  }
+  drawGrid(priceScale, timeScale, candles) {
+    const { ctx, width, height } = this;
+    ctx.strokeStyle = CONFIG.colors.grid; ctx.lineWidth = 1;
+    const priceRange = priceScale.max - priceScale.min;
+    const step = priceRange / 6;
+    for (let i = 0; i <= 6; i++) {
+      const price = priceScale.min + (step * i);
+      const y = priceScale.priceToY(price, height);
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+    }
+    const visible = timeScale.getVisibleRange(width);
+    const timeStep = Math.max(1, Math.floor((visible.end - visible.start) / 6));
+    for (let i = visible.start; i <= visible.end; i += timeStep) {
+      const x = timeScale.indexToX(i, width);
+      if (x < 0 || x > width) continue;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+    }
+  }
+  drawCandles(candles, timeScale, priceScale) {
+    const { ctx, width, height } = this;
+    const visible = timeScale.getVisibleRange(width);
+    const candleWidth = Math.max(2, timeScale.barSpacing * 0.7);
+    for (let i = visible.start; i <= visible.end; i++) {
+      const c = candles[i]; if (!c) continue;
+      const x = timeScale.indexToX(i, width);
+      if (x < -candleWidth || x > width + candleWidth) continue;
+      const yOpen = priceScale.priceToY(c.open, height);
+      const yHigh = priceScale.priceToY(c.high, height);
+      const yLow = priceScale.priceToY(c.low, height);
+      const yClose = priceScale.priceToY(c.close, height);
+      const isUp = c.close >= c.open;
+      const color = isUp ? CONFIG.colors.up : CONFIG.colors.down;
+      ctx.strokeStyle = color; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, yHigh); ctx.lineTo(x, yLow); ctx.stroke();
+      ctx.fillStyle = color;
+      const bodyTop = Math.min(yOpen, yClose);
+      const bodyHeight = Math.max(1, Math.abs(yClose - yOpen));
+      ctx.fillRect(x - candleWidth/2, bodyTop, candleWidth, bodyHeight);
+    }
+  }
+  drawMovingAverage(ma, timeScale, priceScale, candles) {
+    if (!CONFIG.maEnabled) return;
+    const { ctx, width, height } = this;
+    const visible = timeScale.getVisibleRange(width);
+    ctx.strokeStyle = CONFIG.maColor; ctx.lineWidth = 1.5; ctx.setLineDash([]); ctx.beginPath();
+    let started = false;
+    for (let i = visible.start; i <= visible.end; i++) {
+      if (i >= ma.length || ma[i] === null) continue;
+      const x = timeScale.indexToX(i, width);
+      const y = priceScale.priceToY(ma[i], height);
+      if (!started) { ctx.moveTo(x, y); started = true; } else { ctx.lineTo(x, y); }
+    }
+    ctx.stroke();
+  }
+  drawDonchianSignals(signals, timeScale, priceScale, candles) {
+    if (!CONFIG.donchian.enabled || signals.length === 0) return;
+    const { ctx, width, height } = this;
+    let drawnCount = 0;
+    signals.forEach(signal => {
+      const x = timeScale.indexToX(signal.index, width);
+      const candle = candles[signal.index]; if (!candle) return;
+      if (x < -100 || x > width + 100) return;
+      drawnCount++;
+      const cardWidth = 50, cardHeight = 24, halfCard = cardWidth / 2, arrowSize = 8, gap = 3;
+      let y, cardY, arrowTipY, arrowBaseY;
+      if (signal.type === 'buy') {
+        y = priceScale.priceToY(candle.low, height);
+        arrowTipY = y + gap; arrowBaseY = arrowTipY + arrowSize; cardY = arrowBaseY;
+      } else {
+        y = priceScale.priceToY(candle.high, height);
+        arrowTipY = y - gap; arrowBaseY = arrowTipY - arrowSize; cardY = arrowBaseY - cardHeight;
+      }
+      ctx.save();
+      const cardX = x - halfCard;
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 3;
+      ctx.fillStyle = signal.color; ctx.beginPath(); ctx.roundRect(cardX, cardY, cardWidth, cardHeight, 4); ctx.fill();
+      ctx.shadowColor = 'transparent';
+      ctx.fillStyle = signal.color; ctx.beginPath();
+      if (signal.type === 'buy') {
+        ctx.moveTo(x, arrowTipY); ctx.lineTo(x - 6, arrowBaseY); ctx.lineTo(x + 6, arrowBaseY);
+      } else {
+        ctx.moveTo(x, arrowTipY); ctx.lineTo(x - 6, arrowBaseY); ctx.lineTo(x + 6, arrowBaseY);
+      }
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#ffffff'; ctx.font = 'bold 11px "Segoe UI", sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(signal.type === 'buy' ? 'BUY' : 'SELL', x, cardY + cardHeight / 2);
+      ctx.restore();
+    });
+    if (drawnCount > 0) console.log(`Drawn ${drawnCount} Donchian signals`);
+  }
+  drawCrosshair(x, y) {
+    const { ctx, width, height } = this;
+    ctx.strokeStyle = CONFIG.colors.crosshair; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+// ======================
+// PriceAxisRenderer Class
+// ======================
+class PriceAxisRenderer {
+  constructor(canvas) { this.canvas = canvas; this.ctx = canvas.getContext('2d'); this.dpr = window.devicePixelRatio || 1; }
+  resize(width, height) {
+    this.canvas.width = Math.floor(width * this.dpr); this.canvas.height = Math.floor(height * this.dpr);
+    this.canvas.style.width = `${width}px`; this.canvas.style.height = `${height}px`;
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0); this.ctx.scale(this.dpr, this.dpr);
+  }
+  render(priceScale, height) {
+    const { ctx } = this; const width = this.canvas.width / this.dpr;
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = CONFIG.colors.bg; ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = CONFIG.colors.text; ctx.font = '12px sans-serif';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    const priceRange = priceScale.max - priceScale.min; const step = priceRange / 6;
+    for (let i = 0; i <= 6; i++) {
+      const price = priceScale.min + (step * i); const y = priceScale.priceToY(price, height);
+      let text = price >= 1000 ? price.toFixed(0) : price.toFixed(CONFIG.priceDecimals);
+      ctx.fillText(text, 8, y);
+      ctx.fillStyle = CONFIG.colors.grid; ctx.fillRect(0, y - 0.5, 5, 1); ctx.fillStyle = CONFIG.colors.text;
+    }
+  }
+}
+
+// ======================
+// TimeAxisRenderer Class
+// ======================
+class TimeAxisRenderer {
+  constructor(canvas) { this.canvas = canvas; this.ctx = canvas.getContext('2d'); this.dpr = window.devicePixelRatio || 1; }
+  resize(width, height) {
+    this.canvas.width = Math.floor(width * this.dpr); this.canvas.height = Math.floor(height * this.dpr);
+    this.canvas.style.width = `${width}px`; this.canvas.style.height = `${height}px`;
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0); this.ctx.scale(this.dpr, this.dpr);
+  }
+  render(timeScale, candles, width) {
+    const { ctx } = this; const height = this.canvas.height / this.dpr;
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = CONFIG.colors.bg; ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = CONFIG.colors.text; ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    const visible = timeScale.getVisibleRange(width);
+    const timeStep = Math.max(1, Math.floor((visible.end - visible.start) / 6));
+    for (let i = visible.start; i <= visible.end; i += timeStep) {
+      const x = timeScale.indexToX(i, width); if (x < 30 || x > width - 30) continue;
+      const c = candles[i]; if (!c) continue;
+      const date = new Date(c.time * 1000);
+      const text = `${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}`;
+      ctx.fillText(text, x, 8);
+      ctx.fillStyle = CONFIG.colors.grid; ctx.fillRect(x - 0.5, 0, 1, 5); ctx.fillStyle = CONFIG.colors.text;
+    }
+  }
+}
+
+// ======================
+// ModalManager Class
+// ======================
+class ModalManager {
+  constructor() {
+    this.modals = {
+      menu: document.getElementById('menu-modal'), indicators: document.getElementById('indicators-modal'),
+      settings: document.getElementById('settings-modal'), timeframes: document.getElementById('timeframes-modal'),
+      symbols: document.getElementById('symbols-modal'), donchianSettings: document.getElementById('donchian-settings-panel')
+    };
+    this.initModals(); this.initTimeframes(); this.initSettings(); this.initIndicators(); this.initSymbols(); this.initDonchianSettings();
+  }
+  initModals() {
+    document.getElementById('menu-button').addEventListener('click', () => this.showModal('menu'));
+    Object.keys(this.modals).forEach(modalName => {
+      const closeBtn = document.getElementById(`${modalName}-close`);
+      if (closeBtn) closeBtn.addEventListener('click', () => this.hideModal(modalName));
+    });
+    document.querySelectorAll('.menu-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        const action = e.currentTarget.dataset.action; this.hideModal('menu'); this.showModal(action);
+      });
+    });
+    Object.values(this.modals).forEach(modal => {
+      modal.addEventListener('click', (e) => { if (e.target === modal) this.hideAllModals(); });
+    });
+  }
+  initTimeframes() {
+    const TIMEFRAMES = { "5s":5,"10s":10,"15s":15,"30s":30,"1m":60,"2m":120,"3m":180,"5m":300,"10m":600,"15m":900,"30m":1800,"1h":3600,"4h":14400 };
+    const grid = document.getElementById('timeframes-grid');
+    Object.keys(TIMEFRAMES).forEach(tf => {
+      const btn = document.createElement('div'); btn.className = 'timeframe-btn'; btn.textContent = tf;
+      if (tf === currentTimeframe) btn.classList.add('active');
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.timeframe-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active'); selectTimeframe(tf);
+      });
+      grid.appendChild(btn);
+    });
+  }
+  initSettings() {
+    document.getElementById('bg-color').addEventListener('change', e => CONFIG.colors.bg = e.target.value);
+    document.getElementById('up-color').addEventListener('change', e => CONFIG.colors.up = e.target.value);
+    document.getElementById('down-color').addEventListener('change', e => CONFIG.colors.down = e.target.value);
+  }
+  initDonchianSettings() {
+    const lengthInput = document.getElementById('donchian-length'), maInput = document.getElementById('donchian-ma');
+    const buyColorInput = document.getElementById('donchian-buy-color'), sellColorInput = document.getElementById('donchian-sell-color');
+    const applyBtn = document.getElementById('apply-donchian-settings');
+    lengthInput.oninput = e => document.getElementById('donchian-length-value').textContent = e.target.value;
+    maInput.oninput = e => document.getElementById('donchian-ma-value').textContent = e.target.value;
+    applyBtn.onclick = () => {
+      CONFIG.donchian.donchianLength = parseInt(lengthInput.value); CONFIG.donchian.maLength = parseInt(maInput.value);
+      CONFIG.donchian.buyColor = buyColorInput.value; CONFIG.donchian.sellColor = sellColorInput.value;
+      this.hideModal('donchianSettings'); chart.donchianSignals.reset();
+      chart.donchianSignals.processAll(chart.candles); chart.requestRender();
+    };
+  }
+  initIndicators() {
+    const indicatorsList = document.getElementById('indicators-list');
+    const settingsPanel = document.getElementById('indicator-settings-panel');
+    const maPeriodInput = document.getElementById('ma-period'), maPeriodValue = document.getElementById('ma-period-value');
+    const maColorInput = document.getElementById('ma-color'), applyBtn = document.getElementById('apply-ma-settings');
+    function renderIndicatorList() {
+      indicatorsList.innerHTML = `
+        <div class="indicator-item"><div class="indicator-info"><div class="indicator-badge">MA</div><span>Moving Average</span></div>
+        <div class="indicator-actions"><button class="indicator-btn settings" title="Settings"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+        <button class="indicator-btn toggle ${CONFIG.maEnabled ? '' : 'hidden'}" title="Toggle Visibility"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+        <div class="indicator-item"><div class="indicator-info"><div class="indicator-badge" style="background: #1ecb4f; color: #000;">DC</div><span>Donchian Signals</span></div>
+        <div class="indicator-actions"><button class="indicator-btn settings" id="donchian-settings-btn" title="Settings"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+        <button class="indicator-btn toggle ${CONFIG.donchian.enabled ? '' : 'hidden'}" id="donchian-toggle" title="Toggle Visibility"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>`;
+      indicatorsList.querySelector('.settings').onclick = () => settingsPanel.classList.add('active');
+      indicatorsList.querySelector('.toggle').onclick = e => { CONFIG.maEnabled = !CONFIG.maEnabled; e.currentTarget.classList.toggle('hidden', !CONFIG.maEnabled); chart.requestRender(); };
+      document.getElementById('donchian-settings-btn').onclick = () => document.getElementById('donchian-settings-panel').classList.add('active');
+      document.getElementById('donchian-toggle').onclick = e => {
+        CONFIG.donchian.enabled = !CONFIG.donchian.enabled; e.currentTarget.classList.toggle('hidden', !CONFIG.donchian.enabled);
+        if (CONFIG.donchian.enabled) { chart.donchianSignals.processAll(chart.candles); console.log('Donchian enabled, signals:', chart.donchianSignals.getSignals().length); }
+        else chart.donchianSignals.reset(); chart.requestRender();
+      };
+    }
+    document.getElementById('settings-panel-close').onclick = () => settingsPanel.classList.remove('active');
+    applyBtn.onclick = () => { CONFIG.maPeriod = parseInt(maPeriodInput.value); CONFIG.maColor = maColorInput.value; chart.calculateMA(); settingsPanel.classList.remove('active'); };
+    maPeriodInput.oninput = e => maPeriodValue.textContent = e.target.value;
+    renderIndicatorList();
+  }
+  initSymbols() {
+    const searchInput = document.getElementById('symbol-search'), symbolsList = document.getElementById('symbols-list');
+    const self = this, symbols = ["BTC/USDT","ETH/USDT","BNB/USDT","XRP/USDT","SOL/USDT","ADA/USDT","DOGE/USDT","AVAX/USDT","DOT/USDT","MATIC/USDT"];
+    function renderSymbols(filter = '') {
+      const filtered = symbols.filter(s => s.toLowerCase().includes(filter.toLowerCase()));
+      if (filtered.length === 0) { symbolsList.innerHTML = '<div class="no-results">No symbols found</div>'; return; }
+      symbolsList.innerHTML = '';
+      filtered.forEach((s, index) => {
+        const item = document.createElement('div'); item.className = 'symbol-item'; item.dataset.symbol = s;
+        item.innerHTML = `<span class="symbol-name">${s}</span>`; item.style.animationDelay = `${index * 0.05}s`;
+        symbolsList.appendChild(item);
+      });
+      symbolsList.querySelectorAll('.symbol-item').forEach(item => {
+        item.addEventListener('click', () => { selectAsset(item.dataset.symbol); self.hideModal('symbols'); });
+      });
+    }
+    searchInput.addEventListener('input', e => renderSymbols(e.target.value));
+    renderSymbols();
+  }
+  showModal(modalName) { if (this.modals[modalName]) this.modals[modalName].classList.add('active'); }
+  hideModal(modalName) { if (this.modals[modalName]) this.modals[modalName].classList.remove('active'); }
+  hideAllModals() { Object.values(this.modals).forEach(modal => modal.classList.remove('active')); }
+}
+
+// ======================
+// UltraChart Class
+// ======================
+class UltraChart {
+  constructor() {
+    this.container = document.getElementById('chart-container');
+    this.mainCanvas = document.getElementById('main-canvas');
+    this.priceCanvas = document.getElementById('price-canvas');
+    this.timeCanvas = document.getElementById('time-canvas');
+    this.infoPanel = document.getElementById('info-panel');
+    this.priceLine = document.getElementById('price-line');
+    this.lastPriceLabel = document.getElementById('last-price-label');
+    this.mainRenderer = new MainRenderer(this.mainCanvas);
+    this.priceRenderer = new PriceAxisRenderer(this.priceCanvas);
+    this.timeRenderer = new TimeAxisRenderer(this.timeCanvas);
+    this.timeScale = new TimeScale(); this.priceScale = new PriceScale();
+    this.candles = []; this.ma = [];
+    this.crosshair = { x: -1, y: -1, active: false };
+    this.isDragging = false; this.lastMouseX = 0;
+    this.chartWidth = 0; this.chartHeight = 0;
+    this.renderPending = false; this.priceScaleDirty = true; this.autoScroll = true;
+    this.lastCrosshairX = -1; this.lastCrosshairY = -1;
+    this.donchianSignals = new DonchianSignals();
+    this.init();
+  }
+  init() {
+    this.candles = []; this.ma = []; this.timeScale.setData(this.candles);
+    this.calculateDimensions(); this.setupEvents(); this.requestRender();
+    setTimeout(() => document.getElementById('loading').style.display = 'none', 300);
+  }
+  calculateDimensions() {
+    const rect = this.container.getBoundingClientRect();
+    const priceAxisW = 60, timeAxisH = 30;
+    this.chartWidth = rect.width - priceAxisW; this.chartHeight = rect.height - timeAxisH;
+    this.mainRenderer.resize(this.chartWidth, this.chartHeight);
+    this.priceRenderer.resize(priceAxisW, this.chartHeight);
+    this.timeRenderer.resize(this.chartWidth, timeAxisH);
+    this.mainCanvas.style.width = `${this.chartWidth}px`; this.mainCanvas.style.height = `${this.chartHeight}px`;
+    this.priceCanvas.style.width = `${priceAxisW}px`; this.priceCanvas.style.height = `${this.chartHeight}px`;
+    this.timeCanvas.style.width = `${this.chartWidth}px`; this.timeCanvas.style.height = `${timeAxisH}px`;
+    this.priceScaleDirty = true; this.requestRender();
+  }
+  setupEvents() {
+    const canvas = this.mainCanvas;
+    canvas.addEventListener('mousedown', e => { this.isDragging = true; this.autoScroll = false; this.lastMouseX = e.clientX; canvas.style.cursor = 'grabbing'; });
+    window.addEventListener('mousemove', e => {
+      const rect = canvas.getBoundingClientRect();
+      const newX = e.clientX - rect.left, newY = e.clientY - rect.top;
+      const crosshairMoved = Math.abs(newX - this.lastCrosshairX) > 0.5 || Math.abs(newY - this.lastCrosshairY) > 0.5;
+      this.crosshair.x = newX; this.crosshair.y = newY; this.crosshair.active = true;
+      if (this.isDragging) { const delta = e.clientX - this.lastMouseX; this.timeScale.scroll(delta, this.chartWidth); this.lastMouseX = e.clientX; this.priceScaleDirty = true; this.requestRender(); }
+      else if (crosshairMoved && this.crosshair.active) { this.lastCrosshairX = newX; this.lastCrosshairY = newY; this.updateInfo(); this.requestRender(); }
+    });
+    window.addEventListener('mouseup', () => { this.isDragging = false; canvas.style.cursor = 'crosshair'; });
+    canvas.addEventListener('mouseleave', () => { this.crosshair.active = false; this.infoPanel.style.display = 'none'; this.requestRender(); });
+    canvas.addEventListener('mouseenter', () => { this.crosshair.active = true; this.requestRender(); });
+    canvas.addEventListener('wheel', e => { e.preventDefault(); const factor = e.deltaY > 0 ? 0.9 : 1.1; this.timeScale.zoom(factor, this.crosshair.x, this.chartWidth); this.priceScaleDirty = true; this.requestRender(); });
+    window.addEventListener('resize', () => this.calculateDimensions());
+  }
+  updateInfo() {
+    const idx = Math.round(this.timeScale.xToIndex(this.crosshair.x, this.chartWidth));
+    const c = this.candles[idx];
+    if (!c || !this.crosshair.active) { this.infoPanel.style.display = 'none'; return; }
+    const change = ((c.close - c.open) / c.open) * 100, isUp = change >= 0;
+    document.getElementById('info-date').textContent = new Date(c.time * 1000).toLocaleString();
+    const changeEl = document.getElementById('info-change');
+    changeEl.textContent = (isUp ? '+' : '') + change.toFixed(2) + '%'; changeEl.className = 'info-value ' + (isUp ? 'up' : 'down');
+    document.getElementById('info-o').textContent = c.open.toFixed(CONFIG.priceDecimals);
+    document.getElementById('info-h').textContent = c.high.toFixed(CONFIG.priceDecimals);
+    document.getElementById('info-l').textContent = c.low.toFixed(CONFIG.priceDecimals);
+    document.getElementById('info-c').textContent = c.close.toFixed(CONFIG.priceDecimals);
+    const colorClass = isUp ? 'up' : 'down';
+    document.getElementById('info-o').className = 'ohlc-value ' + colorClass;
+    document.getElementById('info-h').className = 'ohlc-value ' + colorClass;
+    document.getElementById('info-l').className = 'ohlc-value ' + colorClass;
+    document.getElementById('info-c').className = 'ohlc-value ' + colorClass;
+    this.infoPanel.style.display = 'block';
+  }
+  updatePriceLineAndLabel() {
+    if (this.candles.length === 0) return;
+    const lastCandle = this.candles[this.candles.length - 1], lastPrice = lastCandle.close;
+    const isUp = lastCandle.close >= lastCandle.open;
+    let lastPriceY = this.priceScale.priceToY(lastPrice, this.chartHeight);
+    if (!isFinite(lastPriceY)) lastPriceY = this.chartHeight / 2;
+    lastPriceY = Math.max(0, Math.min(this.chartHeight, lastPriceY));
+    this.priceLine.style.top = `${lastPriceY}px`; this.priceLine.style.color = isUp ? CONFIG.colors.up : CONFIG.colors.down;
+    this.lastPriceLabel.style.top = `${lastPriceY}px`;
+    this.lastPriceLabel.querySelector('.price').textContent = lastPrice.toFixed(CONFIG.priceDecimals);
+    const candleStart = lastCandle.time, elapsed = (Date.now() / 1000) - candleStart;
+    const remaining = Math.max(0, timeframeSeconds - elapsed);
+    const minutes = Math.floor(remaining / 60), seconds = Math.floor(remaining % 60);
+    this.lastPriceLabel.querySelector('.timer').textContent = `${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+    this.lastPriceLabel.style.background = isUp ? CONFIG.colors.up : CONFIG.colors.down;
+  }
+  calculateMA() {
+    this.ma = [];
+    for (let i = 0; i < this.candles.length; i++) {
+      if (i < CONFIG.maPeriod - 1) this.ma.push(null);
+      else { let sum = 0; for (let j = 0; j < CONFIG.maPeriod; j++) sum += this.candles[i - j].close; this.ma.push(sum / CONFIG.maPeriod); }
+    }
+    this.requestRender();
+  }
+  requestRender() { if (this.renderPending) return; this.renderPending = true; requestAnimationFrame(() => { this.renderPending = false; this.render(); }); }
+  setCandles(candles, resetView = false) {
+    this.candles = candles.map((c, i) => ({ index: i, time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }));
+    this.timeScale.setData(this.candles); this.calculateMA();
+    if (CONFIG.donchian.enabled) { this.donchianSignals.processAll(this.candles); console.log('Initial candles processed, signals:', this.donchianSignals.getSignals().length); }
+    if (resetView) { this.autoScroll = true; this.stickToRight(); } else if (this.autoScroll) this.stickToRight();
+    this.priceScaleDirty = true; this.requestRender();
+  }
+  stickToRight() { const totalWidth = this.candles.length * this.timeScale.barSpacing; this.timeScale.offset = this.chartWidth - totalWidth; }
+  updateLastCandle(candle) {
+    const last = this.candles[this.candles.length - 1]; let needsStick = false;
+    if (!last || candle.time > last.time) {
+      this.candles.push({ index: this.candles.length, time: candle.time, open: candle.open, high: candle.high, low: candle.low, close: candle.close });
+      if (this.candles.length >= CONFIG.maPeriod) { let sum = 0; for (let j = 0; j < CONFIG.maPeriod; j++) sum += this.candles[this.candles.length - 1 - j].close; this.ma.push(sum / CONFIG.maPeriod); }
+      else this.ma.push(null); if (this.autoScroll) needsStick = true;
+    } else {
+      last.open = candle.open; last.high = candle.high; last.low = candle.low; last.close = candle.close;
+      if (this.candles.length >= CONFIG.maPeriod) { let sum = 0; for (let j = 0; j < CONFIG.maPeriod; j++) sum += this.candles[this.candles.length - 1 - j].close; this.ma[this.ma.length - 1] = sum / CONFIG.maPeriod; }
+    }
+    if (needsStick) this.stickToRight();
+    if (CONFIG.donchian.enabled) this.donchianSignals.update(this.candles);
+    this.priceScaleDirty = true; this.requestRender();
+  }
+  setColors(colors) { CONFIG.colors.up = colors.upColor || '#00C510'; CONFIG.colors.down = colors.downColor || '#ff0000'; this.requestRender(); }
+  render() {
+    const { chartWidth: w, chartHeight: h } = this;
+    const visible = this.timeScale.getVisibleRange(w);
+    if (this.priceScaleDirty) { this.priceScale.calculate(this.candles, visible.start, visible.end); this.priceScaleDirty = false; }
+    this.mainRenderer.clear(); this.mainRenderer.drawGrid(this.priceScale, this.timeScale, this.candles);
+    this.mainRenderer.drawCandles(this.candles, this.timeScale, this.priceScale);
+    this.mainRenderer.drawMovingAverage(this.ma, this.timeScale, this.priceScale, this.candles);
+    this.mainRenderer.drawDonchianSignals(this.donchianSignals.getSignals(), this.timeScale, this.priceScale, this.candles);
+    if (this.crosshair.active) this.mainRenderer.drawCrosshair(this.crosshair.x, this.crosshair.y);
+    this.priceRenderer.render(this.priceScale, h); this.timeRenderer.render(this.timeScale, this.candles, w);
+    this.updatePriceLineAndLabel();
+  }
+}
+
+// ======================
+// Bitcoin Data Generator (500 candles)
+// ======================
+function generateBitcoinData(count = 500, startPrice = 65000, timeframeSec = 60) {
+  const candles = [];
+  let price = startPrice, time = Math.floor(Date.now() / 1000) - (count * timeframeSec);
+  for (let i = 0; i < count; i++) {
+    const volatility = 0.003;
+    const change = (Math.random() - 0.48) * volatility * price;
+    const open = price;
+    const close = open + change;
+    const high = Math.max(open, close) + Math.random() * volatility * price * 0.5;
+    const low = Math.min(open, close) - Math.random() * volatility * price * 0.5;
+    candles.push({ time, open: +open.toFixed(2), high: +high.toFixed(2), low: +low.toFixed(2), close: +close.toFixed(2) });
+    price = close; time += timeframeSec;
+  }
+  return candles;
+}
+
+// ======================
+// Global Functions
+// ======================
+function selectAsset(asset) {
+  currentAsset = asset; needsResetView = true;
+  document.querySelector('.symbol').textContent = currentAsset;
+  chart.setCandles(generateBitcoinData(500, asset === "BTC/USDT" ? 65000 : 3500), true);
+}
+function selectTimeframe(tf) {
+  currentTimeframe = tf; needsResetView = true;
+  timeframeSeconds = { "5s":5,"10s":10,"15s":15,"30s":30,"1m":60,"2m":120,"3m":180,"5m":300,"10m":600,"15m":900,"30m":1800,"1h":3600,"4h":14400 }[currentTimeframe];
+  document.querySelector('.timeframe').textContent = currentTimeframe;
+  chart.setCandles(generateBitcoinData(500, 65000, timeframeSeconds), true);
+}
+
+// ======================
+// Initialization
+// ======================
+const chart = new UltraChart();
+const modalManager = new ModalManager();
+
+// Load Bitcoin data on start
+window.addEventListener('load', () => {
+  const btcData = generateBitcoinData(500, 65000, 60);
+  chart.setCandles(btcData, true);
+  needsResetView = false;
+  
+  // Simulate real-time updates every second
+  setInterval(() => {
+    const last = chart.candles[chart.candles.length - 1];
+    if (!last) return;
+    const volatility = 0.002;
+    const change = (Math.random() - 0.48) * volatility * last.close;
+    const newClose = +(last.close + change).toFixed(2);
+    const newHigh = Math.max(last.high, newClose);
+    const newLow = Math.min(last.low, newClose);
+    chart.updateLastCandle({ time: last.time, open: last.open, high: newHigh, low: newLow, close: newClose });
+  }, 1000);
+});
+</script>
+</body>
+</html>
